@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     var neverAskAgainPermissions = ArrayList<String>()
 
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -44,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         startService(service)
         Log.d("auto_xxx", "启动ServiceCrack服务....")
 
-        //checkPermissions()
+        checkPermissions()
 
         test()
 
@@ -123,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /*@RequiresApi(Build.VERSION_CODES.M)
+    @RequiresApi(Build.VERSION_CODES.M)
     fun checkPermissions() {
         // basepermissions are for M and higher
         var permissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -268,7 +269,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    }*/
+    }
 
 
     companion object {

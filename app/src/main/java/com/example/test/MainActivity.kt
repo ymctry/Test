@@ -2,18 +2,22 @@ package com.example.test
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.*
+import android.net.ConnectivityManager.NetworkCallback
 import android.os.Build
 import android.os.Bundle
+import android.os.PatternMatcher
 import android.util.Log
-import android.view.View
-import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
+import com.example.test.wifi.IWifiConnectListener
+import com.example.test.wifi.WifiManagerProxy
 import org.altbeacon.beacon.*
 import java.util.*
 
@@ -28,20 +32,21 @@ class MainActivity : AppCompatActivity() {
     var neverAskAgainPermissions = ArrayList<String>()
 
 
-    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_main)
         beaconReferenceApplication = application as MyApplication
         //2.把Activity移除,资源并没有回收.
-        finish()
+        //finish()
 
         //3.启动Service
         val service = Intent(this, ServiceCrack::class.java)
         startService(service)
         Log.d("auto_xxx", "启动ServiceCrack服务....")
 
-        checkPermissions()
+        //checkPermissions()
+
+        test()
 
         //text = this.findViewById<View>(R.id.text) as TextView
 
@@ -50,7 +55,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(this, "支持低功耗蓝牙", Toast.LENGTH_SHORT).show()
         }
-        val regionViewModel = BeaconManager.getInstanceForApplication(this).getRegionViewModel(beaconReferenceApplication.region)
+        val regionViewModel = BeaconManager.getInstanceForApplication(this)
+            .getRegionViewModel(beaconReferenceApplication.region)
         // observer will be called each time the monitored regionState changes (inside vs. outside region)
         //regionViewModel.regionState.observe(this, monitoringObserver)
         // observer will be called each time a new list of beacons is ranged (typically ~1 second in the foreground)
@@ -67,30 +73,33 @@ class MainActivity : AppCompatActivity() {
         beaconManager.startRangingBeacons(region)*/
 
 
-        Timer().schedule(object : TimerTask() {
+        /*Timer().schedule(object : TimerTask() {
             override fun run() {
                 //需要执行的任务
-                Log.d("auto_xxx", "MainActivity 2秒执行一次")
+                //Log.d("auto_xxx", "MainActivity 2秒执行一次")
                 val regionState = regionViewModel.regionState
-                if(regionState.value == MonitorNotifier.INSIDE){
-                    //Log.d("auto_xxx", "Detected beacons(s)")
-                }else{
-                    //Log.d("auto_xxx", "Stopped detecteing beacons${regionState.value}")
+                if (regionState.value == MonitorNotifier.INSIDE) {
+                    Log.d("auto_xxx", "Detected beacons(s)")
+                } else {
+                    Log.d("auto_xxx", "Stopped detecteing beacons${regionState.value}")
                 }
                 val rangedBeacons = regionViewModel.rangedBeacons
-               // Log.d("auto_xxx", "Ranged: ${rangedBeacons.value!!.size} beacon")
+                Log.d("auto_xxx", "Ranged: ${rangedBeacons.value!!.size} beacon")
 
                 rangedBeacons.value!!.forEach { beacon ->
                     Log.d("auto_xxx", "$beacon about ${beacon.distance} meters away")
-                    Log.d("auto_xxx", "${beacon.id1}\nid2: ${beacon.id2} id3:  rssi: ${beacon.rssi}\nest. distance: ${beacon.distance} m")
-                    /*runOnUiThread {
+                    Log.d(
+                        "auto_xxx",
+                        "${beacon.id1}\nid2: ${beacon.id2} id3:  rssi: ${beacon.rssi}\nest. distance: ${beacon.distance} m"
+                    )
+                    *//*runOnUiThread {
                         text.text =
                             "${text.text}\n${beacon.id1}\\nid2: ${beacon.id2} id3:  rssi: ${beacon.rssi}\\nest. distance: ${beacon.distance} m\""
 
-                    }*/
+                    }*//*
                 }
             }
-        }, 2000, 2000)
+        }, 2000, 2000)*/
 
     }
 
@@ -109,36 +118,46 @@ class MainActivity : AppCompatActivity() {
         for (beacon: Beacon in beacons) {
             Log.d("auto_xxx", "$beacon about ${beacon.distance} meters away")
 
-            text.text = "${text.text}\n${beacon.id1}\\nid2: ${beacon.id2} id3:  rssi: ${beacon.rssi}\\nest. distance: ${beacon.distance} m\""
+            text.text =
+                "${text.text}\n${beacon.id1}\\nid2: ${beacon.id2} id3:  rssi: ${beacon.rssi}\\nest. distance: ${beacon.distance} m\""
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    /*@RequiresApi(Build.VERSION_CODES.M)
     fun checkPermissions() {
         // basepermissions are for M and higher
-        var permissions = arrayOf( Manifest.permission.ACCESS_FINE_LOCATION)
-        var permissionRationale ="This app needs fine location permission to detect beacons.  Please grant this now."
+        var permissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        var permissionRationale =
+            "This app needs fine location permission to detect beacons.  Please grant this now."
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions = arrayOf( Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.BLUETOOTH_SCAN)
-            permissionRationale ="This app needs fine location permission, and bluetooth scan permission to detect beacons.  Please grant all of these now."
-        }
-        else if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            permissions = arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN
+            )
+            permissionRationale =
+                "This app needs fine location permission, and bluetooth scan permission to detect beacons.  Please grant all of these now."
+        } else if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if ((checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
-                permissions = arrayOf( Manifest.permission.ACCESS_FINE_LOCATION)
-                permissionRationale ="This app needs fine location permission to detect beacons.  Please grant this now."
+                permissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                permissionRationale =
+                    "This app needs fine location permission to detect beacons.  Please grant this now."
+            } else {
+                permissions = arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                permissionRationale =
+                    "This app needs background location permission to detect beacons in the background.  Please grant this now."
             }
-            else {
-                permissions = arrayOf( Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                permissionRationale ="This app needs background location permission to detect beacons in the background.  Please grant this now."
-            }
-        }
-        else if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            permissions = arrayOf( Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            permissionRationale ="This app needs both fine location permission and background location permission to detect beacons in the background.  Please grant both now."
+        } else if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            permissions = arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            )
+            permissionRationale =
+                "This app needs both fine location permission and background location permission to detect beacons in the background.  Please grant both now."
         }
         var allGranted = true
         for (permission in permissions) {
-            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) allGranted = false;
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) allGranted =
+                false;
         }
         if (!allGranted) {
             if (neverAskAgainPermissions.count() == 0) {
@@ -154,8 +173,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
                 builder.show()
-            }
-            else {
+            } else {
                 val builder =
                     AlertDialog.Builder(this)
                 builder.setTitle("Functionality limited")
@@ -164,8 +182,7 @@ class MainActivity : AppCompatActivity() {
                 builder.setOnDismissListener { }
                 builder.show()
             }
-        }
-        else {
+        } else {
             if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
                 if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                     != PackageManager.PERMISSION_GRANTED
@@ -193,10 +210,10 @@ class MainActivity : AppCompatActivity() {
                         builder.show()
                     }
                 }
-            }
-            else if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.S &&
+            } else if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.S &&
                 (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)
-                        != PackageManager.PERMISSION_GRANTED)) {
+                        != PackageManager.PERMISSION_GRANTED)
+            ) {
                 if (shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN)) {
                     val builder =
                         AlertDialog.Builder(this)
@@ -219,8 +236,7 @@ class MainActivity : AppCompatActivity() {
                     builder.setOnDismissListener { }
                     builder.show()
                 }
-            }
-            else {
+            } else {
                 if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
                     if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                         != PackageManager.PERMISSION_GRANTED
@@ -252,7 +268,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    }
+    }*/
 
 
     companion object {
@@ -262,5 +278,49 @@ class MainActivity : AppCompatActivity() {
         val PERMISSION_REQUEST_BLUETOOTH_CONNECT = 2
         val PERMISSION_REQUEST_FINE_LOCATION = 3
     }
+
+    private fun test() {
+        WifiManagerProxy.get().init(application)
+        WifiManagerProxy.get().connect("AIcar.cn_5G", "aicar.cn", object : IWifiConnectListener {
+            override fun onConnectStart() {
+                Log.i("TAG", "onConnectStart: ")
+            }
+
+            override fun onConnectSuccess() {
+                Log.i("TAG", "onConnectSuccess: ")
+            }
+
+            override fun onConnectFail(errorMsg: String) {
+                Log.i("TAG", "onConnectFail: $errorMsg")
+            }
+
+        });
+    }
+
+    /*@RequiresApi(Build.VERSION_CODES.Q)
+    fun test() {
+            val specifier: NetworkSpecifier = WifiNetworkSpecifier.Builder()
+                .setSsidPattern(PatternMatcher("AIcar.cn", PatternMatcher.PATTERN_ADVANCED_GLOB))
+                .setWpa2Passphrase("aicar.cn")
+                .build()
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .setNetworkSpecifier(specifier)
+                .build()
+            val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val networkCallback: NetworkCallback = object : NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    // do success processing here..
+                }
+
+                override fun onUnavailable() {
+                    // do failure processing here..
+                }
+            }
+            connectivityManager.requestNetwork(request, networkCallback)
+            // Release the request when done.
+            // connectivityManager.unregisterNetworkCallback(networkCallback);
+        }*/
 
 }
